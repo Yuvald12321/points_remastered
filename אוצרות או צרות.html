@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="he" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Points Remastered</title>
+    <style>
+        :root {
+            --bg-color: #191923;
+            --text-color: #FFFFFF;
+            --bar-bg: #3C3C46;
+            --bar-fill: #2ECC71;
+            --turn-color: #FFD700;
+            --error-color: #E74C3C;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        #app-container {
+            width: 100%;
+            max-width: 600px;
+        }
+
+        /* Setup Screen */
+        #setup-frame {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .label {
+            font-size: 16px;
+            margin-bottom: 5px;
+            margin-top: 15px;
+        }
+
+        input[type="text"], input[type="number"] {
+            font-size: 16px;
+            padding: 8px;
+            text-align: center;
+            border: 1px solid #555;
+            border-radius: 4px;
+            background-color: #fff;
+        }
+
+        button {
+            font-size: 16px;
+            padding: 8px 16px;
+            margin: 5px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+        }
+
+        .btn-standard { background-color: #e0e0e0; color: #000; }
+        .btn-start { background-color: #e0e0e0; color: #000; font-weight: bold; margin-top: 30px; font-size: 18px; padding: 10px 20px;}
+        
+        #players-list-label {
+            color: var(--turn-color);
+            font-size: 14px;
+            margin-top: 15px;
+            text-align: center;
+        }
+
+        /* Game Screen */
+        #game-frame {
+            display: none;
+            flex-direction: column;
+            width: 100%;
+        }
+
+        #goal-display {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--turn-color);
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .player-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .player-name {
+            font-size: 16px;
+            font-weight: bold;
+            width: 100px;
+            padding: 5px 10px;
+            border: 2px solid transparent;
+            border-radius: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .player-percent {
+            width: 40px;
+            text-align: right;
+            font-size: 14px;
+        }
+
+        .bar-container {
+            flex-grow: 1;
+            height: 25px;
+            background-color: var(--bar-bg);
+            margin: 0 15px;
+            position: relative;
+        }
+
+        .bar-fill {
+            height: 100%;
+            width: 0%;
+            position: absolute;
+            transition: width 0.3s ease, background-color 0.3s ease;
+        }
+
+        /* Controls */
+        #controls-frame {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 30px;
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        #points-entry {
+            width: 100px;
+            font-size: 20px;
+            margin-right: 10px;
+        }
+
+        .btn-plus { background-color: var(--bar-fill); color: #000; font-weight: bold; font-size: 18px; width: 50px; }
+        .btn-e { background-color: var(--error-color); color: #FFF; font-weight: bold; font-size: 18px; width: 50px; }
+        .btn-undo { background-color: #F1C40F; color: #000; font-size: 14px; }
+
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <div id="setup-frame">
+        <div class="label">Winning Score (Default 8000):</div>
+        <input type="number" id="goal-entry" value="8000">
+
+        <div class="label">Player Name:</div>
+        <input type="text" id="name-entry" autocomplete="off">
+
+        <button class="btn-standard" onclick="addPlayer()">Add Player</button>
+        <div id="players-list-label">Players: </div>
+
+        <button class="btn-start" onclick="startGame()">Start Game</button>
+    </div>
+
+    <div id="game-frame">
+        <div id="goal-display"></div>
+        <div id="players-container"></div>
+
+        <div id="controls-frame">
+            <div class="input-group">
+                <input type="number" id="points-entry" autocomplete="off">
+                <button class="btn-plus" onclick="handleAction(false)">+</button>
+                <button class="btn-e" onclick="handleAction(true)">E</button>
+            </div>
+            <button class="btn-undo" onclick="undo()">Undo Last Action</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let playersNames = [];
+    let playersData = {};
+    let historyStack = [];
+    let winners = [];
+    let goal = 8000;
+    let state = { turn: 0 };
+
+    // Setup Functions
+    document.getElementById("name-entry").addEventListener("keypress", function(event) {
+        if (event.key === "Enter") addPlayer();
+    });
+
+    document.getElementById("points-entry").addEventListener("keypress", function(event) {
+        if (event.key === "Enter") handleAction(false);
+    });
+
+    function addPlayer() {
+        const nameEntry = document.getElementById("name-entry");
+        const name = nameEntry.value.trim();
+        if (name) {
+            playersNames.push(name);
+            nameEntry.value = "";
+            document.getElementById("players-list-label").innerText = "Players: " + playersNames.join(", ");
+        }
+        nameEntry.focus();
+    }
+
+    function startGame() {
+        const goalVal = parseInt(document.getElementById("goal-entry").value);
+        goal = isNaN(goalVal) ? 8000 : goalVal;
+
+        if (playersNames.length < 2) {
+            alert("Add at least 2 players!");
+            return;
+        }
+
+        playersNames.forEach(name => playersData[name] = 0);
+
+        document.getElementById("setup-frame").style.display = "none";
+        document.getElementById("game-frame").style.display = "flex";
+        document.getElementById("goal-display").innerText = "GOAL: " + goal;
+
+        buildPlayerRows();
+        updateDisplay();
+        document.getElementById("points-entry").focus();
+    }
+
+    // Game Functions
+    function buildPlayerRows() {
+        const container = document.getElementById("players-container");
+        container.innerHTML = ""; // Clear
+        
+        playersNames.forEach(name => {
+            const row = document.createElement("div");
+            row.className = "player-row";
+            row.id = `row-${name}`;
+
+            const label = document.createElement("div");
+            label.className = "player-name";
+            label.id = `label-${name}`;
+            label.innerText = `${name}: 0`;
+
+            const barContainer = document.createElement("div");
+            barContainer.className = "bar-container";
+
+            const barFill = document.createElement("div");
+            barFill.className = "bar-fill";
+            barFill.id = `bar-${name}`;
+            barContainer.appendChild(barFill);
+
+            const percent = document.createElement("div");
+            percent.className = "player-percent";
+            percent.id = `percent-${name}`;
+            percent.innerText = "0%";
+
+            row.appendChild(label);
+            row.appendChild(barContainer);
+            row.appendChild(percent);
+            container.appendChild(row);
+        });
+    }
+
+    function updateDisplay() {
+        playersNames.forEach((name, i) => {
+            const score = playersData[name];
+            const label = document.getElementById(`label-${name}`);
+            const percentLabel = document.getElementById(`percent-${name}`);
+            const bar = document.getElementById(`bar-${name}`);
+
+            // Turn Indicator
+            if (i === state.turn) {
+                label.style.borderColor = "var(--turn-color)";
+                label.style.color = "var(--turn-color)";
+            } else {
+                label.style.borderColor = "transparent";
+                label.style.color = "var(--text-color)";
+            }
+
+            label.innerText = `${name}: ${score}`;
+
+            let progress = goal > 0 ? Math.min(Math.abs(score) / goal, 1.0) : 0;
+
+            if (winners.includes(name)) {
+                let rank = winners.indexOf(name) + 1;
+                percentLabel.innerText = `#${rank}`;
+                bar.style.width = `${progress * 100}%`;
+                bar.style.backgroundColor = "var(--turn-color)";
+                bar.style.left = "0";
+                bar.style.right = "auto";
+            } else if (score >= 0) {
+                let percent = goal > 0 ? Math.floor((score / goal) * 100) : 0;
+                percentLabel.innerText = `${percent}%`;
+                bar.style.width = `${progress * 100}%`;
+                bar.style.backgroundColor = "var(--bar-fill)";
+                bar.style.left = "0";
+                bar.style.right = "auto";
+            } else {
+                let percent = goal > 0 ? Math.floor((score / goal) * 100) : 0;
+                percentLabel.innerText = `${percent}%`;
+                bar.style.width = `${progress * 100}%`;
+                bar.style.backgroundColor = "var(--error-color)";
+                bar.style.left = "auto";
+                bar.style.right = "0";
+            }
+        });
+    }
+
+    function handleAction(isE) {
+        const pointsInput = document.getElementById("points-entry");
+        const points = parseInt(pointsInput.value);
+        if (isNaN(points)) return;
+
+        const activeName = playersNames[state.turn];
+        const prevTurn = state.turn;
+
+        if (isE) {
+            playersNames.forEach(p => {
+                if (p !== activeName && !winners.includes(p)) {
+                    playersData[p] -= points;
+                    historyStack.push({ name: p, pts: -points, turn: null });
+                }
+            });
+            historyStack.push({ name: null, pts: 0, turn: prevTurn });
+        } else {
+            playersData[activeName] += points;
+            historyStack.push({ name: activeName, pts: points, turn: prevTurn });
+        }
+
+        if (playersData[activeName] >= goal && !winners.includes(activeName)) {
+            winners.push(activeName);
+        }
+
+        if (winners.length >= playersNames.length - 1) {
+            playersNames.forEach(p => {
+                if (!winners.includes(p)) winners.push(p);
+            });
+            updateDisplay();
+
+            let lbText = "LEADERBOARD\n\n";
+            winners.forEach((w, i) => {
+                lbText += `${i + 1}. ${w} - ${playersData[w]}\n`;
+            });
+
+            // Small timeout to allow UI to update before alert blocks thread
+            setTimeout(() => {
+                alert("Game Over\n\n" + lbText);
+                location.reload(); // Replicates root.destroy() by resetting the app
+            }, 100);
+            return;
+        }
+
+        state.turn = (state.turn + 1) % playersNames.length;
+        while (winners.includes(playersNames[state.turn])) {
+            state.turn = (state.turn + 1) % playersNames.length;
+        }
+
+        pointsInput.value = "";
+        updateDisplay();
+        pointsInput.focus();
+    }
+
+    function undo() {
+        if (historyStack.length === 0) return;
+
+        let lastAction = historyStack.pop();
+        while (lastAction) {
+            if (lastAction.name) {
+                playersData[lastAction.name] -= lastAction.pts;
+                if (playersData[lastAction.name] < goal && winners.includes(lastAction.name)) {
+                    winners = winners.filter(w => w !== lastAction.name);
+                }
+            }
+            
+            if (lastAction.turn !== null) {
+                state.turn = lastAction.turn;
+            }
+
+            if (historyStack.length === 0 || historyStack[historyStack.length - 1].turn !== null) {
+                break;
+            }
+            lastAction = historyStack.pop();
+        }
+
+        updateDisplay();
+    }
+</script>
+
+</body>
+</html>
