@@ -12,8 +12,7 @@ def setup():
     setup_frame = tk.Frame(root, bg=BG_COLOR)
     setup_frame.pack(padx=20, pady=20, fill="both", expand=True)
 
-    tk.Label(setup_frame, text="Winning Score (Default 8000):", fg=TEXT_COLOR, bg=BG_COLOR, font=("Arial", 12)).pack(
-        pady=5)
+    tk.Label(setup_frame, text="Winning Score (Default 8000):", fg=TEXT_COLOR, bg=BG_COLOR, font=("Arial", 12)).pack(pady=5)
     goal_entry = tk.Entry(setup_frame, font=("Arial", 12))
     goal_entry.pack(pady=5)
     goal_entry.insert(0, "8000")

@@ -8,7 +8,7 @@ def install_file(filename):
         src = Path(__file__).resolve().parent / filename
         dest = Path.home() / "Desktop"
         shutil.copy2(src, dest)
-    except Exception:
+    except:
         pass
 
 def quick_play():
